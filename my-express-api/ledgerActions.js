@@ -5,8 +5,8 @@ const path = require('path')
 const {Gateway, Wallets } = require('fabric-network');
 const walletPath = path.join(__dirname, 'wallet');
 // some vars
-const org1UserId = 'roland';
-const channelName = 'channell';
+const org1UserId = 'danh';
+const channelName = 'mychannel';
 const chaincodeName = 'basic';
 async function main () {
     try {

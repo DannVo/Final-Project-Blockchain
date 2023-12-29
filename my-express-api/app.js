@@ -1,48 +1,83 @@
 // app.js
-
+const express = require('express');
+const bodyParser = require('body-parser');
 const { Wallets, Gateway } = require('fabric-network');
 const path = require('path');
-const fs = require('fs');
+const helper = require('./helper');
+const ccpPath = path.resolve('\\\\wsl.localhost\\Ubuntu-20.04\\home\\anthonyvo\\go\\src\\github.com\\fabric\\fabric-samples\\test-network', 'organizations', 'peerOrganizations', 'org1.example.com', 'connection-org1.json');
+const app = express();
+const port = 3000;
 
-const { registerAndEnrollUser } = require('./caActions');
-const { queryAllAssets } = require('./ledgerActions');
+app.use(bodyParser.json());
 
-async function main() {
-  try {
-    const ccpPath = path.resolve(__dirname, 'connection.json');
-    const ccpJSON = fs.readFileSync(ccpPath, 'utf8');
-    const ccp = JSON.parse(ccpJSON);
+app.get('/api/all-products', async (req, res) => {
+    try {
+        const ccp = helper.buildCCPOrg1();
+        const wallet = await helper.buildWallet(Wallets, './wallet');
+        const gateway = new Gateway();
+        await gateway.connect(ccp, {
+            wallet,
+            identity: 'danh',
+            discovery: { enabled: true, asLocalhost: true }
+        });
 
-    const caInfo = ccp.certificateAuthorities['ca.org1.example.com'];
-    const walletPath = path.join(process.cwd(), 'wallet');
-    const mspId = 'Org1MSP'; // Adjust as needed
-    const enrollmentID = 'user1';
-    const enrollmentSecret = 'user1pw';
+        const network = await gateway.getNetwork('mychannel');
+        const contract = network.getContract('basic');
 
-    // Register and enroll user
-    await registerAndEnrollUser(caInfo, walletPath, enrollmentID, enrollmentSecret, mspId);
+        const result = await contract.evaluateTransaction('GetAllAssets');
+        res.json(JSON.parse(result.toString()));
+        await gateway.disconnect();
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
 
-    // Use the registered and enrolled user to interact with the ledger
-    const wallet = await Wallets.newFileSystemWallet(walletPath);
-    const identity = await wallet.get(enrollmentID);
-    const gateway = new Gateway();
-    await gateway.connect(ccp, {
-      wallet,
-      identity: enrollmentID,
-      discovery: { enabled: true, asLocalhost: true },
-    });
+app.get('/api/product/detail/:assetId', async (req, res) => {
+    try {
+        const assetId = req.params.assetId;
+        const ccp = helper.buildCCPOrg1();
+        const wallet = await helper.buildWallet(Wallets, './wallet');
+        const gateway = new Gateway();
+        await gateway.connect(ccp, {
+            wallet,
+            identity: 'danh',
+            discovery: { enabled: true, asLocalhost: true }
+        });
 
-    const network = await gateway.getNetwork('mychannel');
-    const contract = network.getContract('basic');
+        const network = await gateway.getNetwork('mychannel');
+        const contract = network.getContract('basic');
 
-    // Query all assets
-    const allAssets = await queryAllAssets(contract);
-    console.log(`All Assets: ${allAssets}`);
+        const result = await contract.evaluateTransaction('ReadAsset', assetId);
+        res.json(JSON.parse(result.toString()));
+        await gateway.disconnect();
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
 
-    await gateway.disconnect();
-  } catch (error) {
-    console.error(`Error: ${error.message}`);
-  }
-}
+app.post('/api/new/product', async (req, res) => {
+    try {
+        const { assetId, color, size, owner, appraisedValue } = req.body;
+        const ccp = helper.buildCCPOrg1();
+        const wallet = await helper.buildWallet(Wallets, './wallet');
+        const gateway = new Gateway();
+        await gateway.connect(ccp, {
+            wallet,
+            identity: 'danh',
+            discovery: { enabled: true, asLocalhost: true }
+        });
 
-main();
+        const network = await gateway.getNetwork('mychannel');
+        const contract = network.getContract('basic');
+
+        await contract.submitTransaction('CreateAsset', assetId, color, size, owner, appraisedValue);
+        res.json({ success: true, message: 'Asset created successfully' });
+        await gateway.disconnect();
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
+});

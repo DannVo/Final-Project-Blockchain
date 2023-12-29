@@ -24,7 +24,7 @@ exports.buildCCPOrg1 = function(){
 exports.buildWallet = async function (Wallets, walletPath) {
     let wallet;
     if (walletPath) {
-        wallet = await Wallets.newFileSystemWallet (walletPath);
+        wallet = await Wallets.newFileSystemWallet(walletPath);
         console.log(`Built a file system wallet at ${walletPath}`);
 
     }
